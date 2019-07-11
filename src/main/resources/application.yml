@@ -1,0 +1,25 @@
+
+
+spring:
+  datasource:
+    driver-class-name: org.sqlite.JDBC
+    url: jdbc:sqlite:C:\\dev\\sqllite\\db.db
+    username:
+    password:
+  ### sqlite需要自己配置连接方式
+  jpa:
+    database-platform: com.vdesign.gani.config.SQLiteDialect #自己配置的方言
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  thymeleaf:
+    cache: false
+  devtools:
+    livereload:
+      enabled: true
+  redis:
+    host: 127.0.0.1
+    port: 6379
+logging:
+  level:
+    com.vdesign: debug
