@@ -14,8 +14,10 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.util.StopWatch;
+import org.springframework.util.StringUtils;
 
 import javax.annotation.Resource;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -47,15 +49,20 @@ public class GaniTest {
     CaseImgRepository caseImgRepository;
     private @Resource
     CaseRepository caseRepository;
-    private @Resource ProdAttrRepository prodAttrRepository;
-    private @Resource ProdImgRepository prodImgRepository;
-    private @Resource ProductRepository productRepository;
-    private @Resource SattrRepository sattrRepository;
+    private @Resource
+    ProdAttrRepository prodAttrRepository;
+    private @Resource
+    ProdImgRepository prodImgRepository;
+    private @Resource
+    ProductRepository productRepository;
+    private @Resource
+    SattrRepository sattrRepository;
 
 
     volatile List<RespProduct> products = new ArrayList<>();
     volatile List<RespCase> cases = new ArrayList<>();
     volatile Set<String> caseIds = new HashSet<>();
+    Set<String> picUrls = new HashSet<>();
 
     /**
      * 获取gani数据
@@ -119,7 +126,7 @@ public class GaniTest {
         List<Product> productList = new ArrayList<>();
         List<Case> caseList = new ArrayList<>();
         // prod->case对应关系
-        Set<String> map = new HashSet<>();
+        Map<String, String> proCasePic = new HashMap<>();
         // 所有attr数据
         List<Attr> attrs = new ArrayList<>();
         // 所有sattr数据
@@ -128,20 +135,23 @@ public class GaniTest {
         List<CaseAttr> caseAttrs = new ArrayList<>();
         int caseattrId = 1;
         // prod 属性数据
-        List<ProdAttr> prodAttrs= new ArrayList<>();
+        List<ProdAttr> prodAttrs = new ArrayList<>();
         int prodAttrId = 1;
         // case imags 数据
         List<CaseImg> caseImages = new ArrayList<>();
         // prod imags 数据
         List<ProdImg> prodImgs = new ArrayList<>();
         for (RespProduct respProduct : products) {
+            picUrls.add(respProduct.getProductPreview());
             Product product = new Product();
             BeanUtils.copyProperties(respProduct, product);
+            product.setProductPreview(respProduct.getProductPreview());
             productList.add(product);
             List<RespProduct.CaseData> caseData = respProduct.getCaseData();
             if (caseData != null && caseData.size() > 0) {
                 for (RespProduct.CaseData caseDatum : caseData) {
-                    map.add(respProduct.getId() + "-" + caseDatum.getId());
+                    picUrls.add(caseDatum.getPreview());
+                    proCasePic.put(respProduct.getId() + "-" + caseDatum.getId(), caseDatum.getPreview());
                 }
             }
             List<RespProduct.ProductAttrData> productAttrData = respProduct.getProductAttrData();
@@ -149,7 +159,7 @@ public class GaniTest {
                 for (RespProduct.ProductAttrData productAttrDatum : productAttrData) {
                     attrs.add(new Attr().setId(productAttrDatum.getId()).setAttrName(productAttrDatum.getProductAttrName()).setAttrType(productAttrDatum.getType()));
                     List<RespProduct.ProductAttrData.SattrData> sattrData = productAttrDatum.getSattrData();
-                    if (sattrData != null && sattrData.size()> 0) {
+                    if (sattrData != null && sattrData.size() > 0) {
                         for (RespProduct.ProductAttrData.SattrData sattrDatum : sattrData) {
                             sattrs.add(new Sattr().setId(sattrDatum.getId()).setAttrName(sattrDatum.getProductAttrName()).setPath(sattrDatum.getPath()));
                             ProdAttr prodAttr = new ProdAttr()
@@ -183,13 +193,18 @@ public class GaniTest {
         }
 
         for (RespCase respCase : cases) {
+            picUrls.add(respCase.getHeadimg());
             Case aCase = new Case();
             BeanUtils.copyProperties(respCase, aCase);
+            aCase.setHeadimg(respCase.getHeadimg());
             caseList.add(aCase);
             List<RespProduct> caseProducts = respCase.getProducts();
             if (caseProducts != null && caseProducts.size() > 0) {
                 for (RespProduct caseProduct : caseProducts) {
-                    map.add(caseProduct.getId() + "-" + respCase.getId());
+                    String key = caseProduct.getId() + "-" + respCase.getId();
+                    if (!proCasePic.containsKey(key)) {
+                        proCasePic.put(key, "");
+                    }
                 }
             }
 
@@ -221,12 +236,17 @@ public class GaniTest {
                     }
                 }
             }
-
+            if (respCase.getId().equals("758")) {
+                System.out.println();
+            }
             List<RespCase.Img> imgs = respCase.getImgs();
             if (imgs != null && imgs.size() > 0) {
                 for (RespCase.Img img : imgs) {
+                    picUrls.add(img.getPath());
                     CaseImg caseImg = new CaseImg();
+                    caseImg.setCaseId(respCase.getId());
                     BeanUtils.copyProperties(img, caseImg);
+                    caseImg.setPath(img.getPath());
                     caseImages.add(caseImg);
                     List<String> productIdList = img.getProductList();
                     if (productIdList != null && productIdList.size() > 0) {
@@ -234,15 +254,17 @@ public class GaniTest {
                         for (String s : productIdList) {
                             builder.append(s).append(",");
                         }
-                        caseImg.setProductIds(builder.substring(0, productIdList.size() - 1));
+                        caseImg.setProductIds(builder.substring(0, builder.length() - 1));
                     }
                     List<String> attrList1 = img.getAttrList();
                     if (attrList1 != null && attrList1.size() > 0) {
                         StringBuilder builder = new StringBuilder("");
                         for (String s : attrList1) {
+                            if (StringUtils.isEmpty(s))
+                                continue;
                             builder.append(s).append(",");
                         }
-                        caseImg.setAttrIds(builder.substring(0, attrList1.size() - 1));
+                        caseImg.setAttrIds(builder.substring(0, builder.length() - 1));
                     }
                 }
             }
@@ -250,23 +272,23 @@ public class GaniTest {
 
         List<ProdCase> productCases = new ArrayList<>();
         int i = 1;
-        for (String s : map) {
+        for (String s : proCasePic.keySet()) {
             String[] split = s.split("-");
-            productCases.add(new ProdCase().setProdId(split[0]).setCaseId(split[1]).setId(i++ + ""));
+            productCases.add(new ProdCase().setProdId(split[0]).setCaseId(split[1]).setId(i++ + "").setCasePic(proCasePic.get(s)));
         }
 
         attrs = attrs.parallelStream().collect(Collectors.collectingAndThen(Collectors.toCollection(() -> new TreeSet<>(Comparator.comparing(Attr::getId))), ArrayList::new));
         sattrs = sattrs.parallelStream().collect(Collectors.collectingAndThen(Collectors.toCollection(() -> new TreeSet<>(Comparator.comparing(Sattr::getId))), ArrayList::new));
 
-//        attrRepository.deleteAll();
-//        caseRepository.deleteAll();
-//        caseAttrRepository.deleteAll();
-//        caseImgRepository.deleteAll();
-//        prodImgRepository.deleteAll();
-//        prodAttrRepository.deleteAll();
-//        productRepository.deleteAll();
-//        prodCaseRepository.deleteAll();
-//        sattrRepository.deleteAll();
+        attrRepository.deleteAll();
+        caseRepository.deleteAll();
+        caseAttrRepository.deleteAll();
+        caseImgRepository.deleteAll();
+        prodImgRepository.deleteAll();
+        prodAttrRepository.deleteAll();
+        productRepository.deleteAll();
+        prodCaseRepository.deleteAll();
+        sattrRepository.deleteAll();
 
         attrRepository.saveAll(attrs);
         caseRepository.saveAll(caseList);
@@ -277,17 +299,41 @@ public class GaniTest {
         prodImgRepository.saveAll(prodImgs);
         productRepository.saveAll(productList);
         sattrRepository.saveAll(sattrs);
+
+
+        // 下载图片
+
+        /*for (String picUrl : picUrls) {
+            if (StringUtils.isEmpty(picUrl))
+                continue;
+            try {
+                log.info("获取图片数据：{}", picUrl);
+                String pic = getData.getPic(picUrl);
+                log.info("{}", pic);
+            } catch (IOException e) {
+                log.error("获取图片出错", e);
+                e.printStackTrace();
+            }
+        }*/
     }
 
 
     @Test
     public void test3() {
-        List<RespProduct> products = (List<RespProduct>) redisUtil.get("products");
-        List<RespCase> cases = (List<RespCase>) redisUtil.get("cases");
-        Map<String, RespCase> caseMap = cases.parallelStream().collect(Collectors.toMap(RespCase::getId, casee -> casee, (k1, k2) -> k1));
-        RespCase aCase = caseMap.get("758");
-        String json = JsonUtil.obj2json(aCase);
-        System.out.println();
+        List<Product> all = productRepository.findAll();
+        int processors = Runtime.getRuntime().availableProcessors();
+        ExecutorService executorService = Executors.newFixedThreadPool(processors);
+        for (Product product : all) {
+            executorService.execute(() -> {
+                try {
+                    log.info("获取图片数据：{}", product.getProductPreview());
+                    getData.getPic(product.getProductPreview());
+                } catch (IOException e) {
+                    log.error("下载图片异常", e);
+                    e.printStackTrace();
+                }
+            });
+        }
     }
 
 

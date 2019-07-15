@@ -13,8 +13,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.io.*;
 
 /**
  * @Description
@@ -29,12 +28,11 @@ public class GetData {
     private static final String PRODUCT_LIST = "https://shopapp.gani.com.cn/smi/Gani_shop_webapi/getProductList";
     private static final String PRODUCT_INFO = "https://shopapp.gani.com.cn/smi/Gani_shop_webapi/getProductInfo";
     private static final String CASE_INFO = "https://shopapp.gani.com.cn/smi/Gani_shop_webapi/getCaseInfo";
-    private BlockingQueue queue = new LinkedBlockingQueue();
+    private static final String PIC_URL = "https://gani-file.oss-cn-shenzhen.aliyuncs.com/";
+    private static final String PIC_PATH = "C:/pic/";
+
 
     public ProdList getProdList() {
-//        int processors = Runtime.getRuntime().availableProcessors();
-//        ExecutorService executorService = Executors.newFixedThreadPool(processors * 2);
-
         MultiValueMap<String, Object> map = new LinkedMultiValueMap();
         map.add("attrs", "");
         map.add("brand_id", "12");
@@ -73,16 +71,29 @@ public class GetData {
     }
 
 
-    class TaskProduct implements Runnable {
-        @Override
-        public void run() {
-            ResponseEntity<RespProduct> productResponseEntity = restTemplate.getForEntity(PRODUCT_INFO, RespProduct.class);
-            if (productResponseEntity.getStatusCodeValue() == 200) {
-
-            } else if (productResponseEntity.getStatusCodeValue() == 401) {
-
+    public String getPic(String url) throws IOException {
+        FileOutputStream fos = null;
+        InputStream inputStream = null;
+        String picName = url.replaceAll("/", "-");
+        try {
+            ResponseEntity<byte[]> responseEntity = restTemplate.getForEntity(PIC_URL + url, byte[].class);
+            fos = new FileOutputStream(new File(PIC_PATH + picName));
+            inputStream = new ByteArrayInputStream(responseEntity.getBody());
+            int len = 0;
+            byte[] buf = new byte[4096];
+            while ((len = inputStream.read(buf, 0, 4096)) != -1) {
+                fos.write(buf, 0, len);
+            }
+            fos.flush();
+        } finally {
+            if (inputStream != null) {
+                inputStream.close();
+            }
+            if (fos != null) {
+                fos.close();
             }
         }
+        return picName;
     }
 
 

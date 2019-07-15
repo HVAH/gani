@@ -26,4 +26,5 @@ public class ProdCase {
     private String id;
     private String prodId;
     private String caseId;
+    private String casePic;
 }

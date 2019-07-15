@@ -24,6 +24,7 @@ import javax.persistence.Table;
 public class CaseImg {
     @Id
     private String id;
+    private String caseId;
     private String groupname;
     private String imgType;
     private String path;
